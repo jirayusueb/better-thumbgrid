@@ -8,7 +8,13 @@ Generate grid thumbnails and metadata overlay from video files.
 
 ## Installation
 
-### Via npm (recommended)
+### As OpenCode Skill
+
+```bash
+npx skills@latest add jirayusueb/better-thumbgrid
+```
+
+### Via npm
 
 ```bash
 npm install -g better-thumbgrid
