@@ -2,7 +2,19 @@
 
 Generate grid thumbnails and metadata overlay from video files.
 
+[![npm version](https://img.shields.io/npm/v/better-thumbgrid)](https://www.npmjs.com/package/better-thumbgrid)
+[![GitHub](https://img.shields.io/github/license/jirayusueb/better-thumbgrid)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/jirayusueb/better-thumbgrid)](https://github.com/jirayusueb/better-thumbgrid)
+
 ## Installation
+
+### Via npm (recommended)
+
+```bash
+npm install -g better-thumbgrid
+```
+
+### From source
 
 ```bash
 bun install
@@ -11,9 +23,29 @@ bun run build
 
 ## CLI Usage
 
+### Quick Start
+
 ```bash
 thumbgrid -i video.mp4 -o output.png
-thumbgrid -i video.mp4 -c 4 -r 3 --no-overlay
+```
+
+### Examples
+
+```bash
+# Custom grid layout
+thumbgrid -i video.mp4 -o output.png -c 4 -r 3
+
+# No overlay
+thumbgrid -i video.mp4 -o output.png --no-overlay
+
+# JPEG with quality
+thumbgrid -i video.mp4 -o output.jpg -f jpg -q 90
+
+# Force overwrite
+thumbgrid -i video.mp4 -o existing.png -F
+
+# Verbose logging
+thumbgrid -i video.mp4 -o output.png -v
 ```
 
 ### Options
@@ -32,6 +64,7 @@ thumbgrid -i video.mp4 -c 4 -r 3 --no-overlay
 | `-v, --verbose` | Enable verbose logging | false |
 | `--no-overlay` | Disable metadata overlay | false |
 | `-V, --version` | Show version | false |
+| `-?, --help` | Show help | false |
 
 ## Library Usage
 
@@ -78,7 +111,6 @@ See the `examples/` directory for runnable scripts.
 ### Basic Example
 
 ```bash
-# Put your video in the examples folder as SampleVideo_1280x720_1mb.mp4
 cd examples
 bun run basic.ts
 ```
@@ -88,6 +120,13 @@ bun run basic.ts
 ```bash
 cd examples
 bun run custom.ts video.mp4 custom_output.jpg
+```
+
+### Benchmark
+
+```bash
+cd examples
+bun run benchmark.ts video.mp4
 ```
 
 ## Development
