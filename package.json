@@ -1,0 +1,41 @@
+{
+  "name": "better-thumbgrid",
+  "version": "1.0.0",
+  "description": "Generate grid thumbnails and metadata overlay from video files",
+  "type": "module",
+  "author": "Your Name <your@email.com>",
+  "license": "MIT",
+  "keywords": ["video", "thumbnail", "grid", "ffmpeg", "cli"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/better-thumbgrid"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/better-thumbgrid/issues"
+  },
+  "bin": {
+    "thumbgrid": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": "./dist/lib.mjs"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "bun run ./src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "fs-extra": "^11.3.4",
+    "ora": "^9.3.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/fs-extra": "^11.0.4",
+    "tsdown": "^0.21.9",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
+  }
+}
