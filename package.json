@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "description": "Generate grid thumbnails and metadata overlay from video files",
   "type": "module",
-  "author": "Your Name <your@email.com>",
+  "author": "Jirayu Sueb <jirayusueb@gmail.com>",
   "license": "MIT",
   "keywords": ["video", "thumbnail", "grid", "ffmpeg", "cli"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/better-thumbgrid"
+    "url": "https://github.com/jirayusueb/better-thumbgrid"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/better-thumbgrid/issues"
+    "url": "https://github.com/jirayusueb/better-thumbgrid/issues"
   },
   "bin": {
     "thumbgrid": "./dist/cli.mjs"
