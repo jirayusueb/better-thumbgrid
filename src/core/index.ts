@@ -6,6 +6,8 @@ import fs from "fs-extra";
 import { logger } from "../utils/logger";
 import { formatBytes, formatDuration } from "../utils/formatters";
 import { generateTimestamps } from "../utils/timestamps";
+export { formatBytes, formatDuration } from "../utils/formatters";
+export { generateTimestamps } from "../utils/timestamps";
 
 const FFMPEG_STATIC_PATH = require("ffmpeg-static");
 const FFPROBE_STATIC_PATH = require("ffprobe-static");

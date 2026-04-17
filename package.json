@@ -23,7 +23,8 @@
   },
   "type": "module",
   "exports": {
-    ".": "./dist/core/index.mjs"
+    ".": "./dist/core/index.mjs",
+    "./cli": "./dist/cli.mjs"
   },
   "scripts": {
     "build": "tsdown",
