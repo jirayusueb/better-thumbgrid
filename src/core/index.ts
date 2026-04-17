@@ -1,11 +1,14 @@
-import { spawn } from "child_process";
-import path from "path";
-import os from "os";
+import { spawn } from "node:child_process";
+import path from "node:path";
+import os from "node:os";
 import sharp from "sharp";
 import fs from "fs-extra";
-import { logger } from "./logger";
+import { logger } from "../utils/logger";
+import { formatBytes, formatDuration } from "../utils/formatters";
+import { generateTimestamps } from "../utils/timestamps";
 
 const FFMPEG_STATIC_PATH = require("ffmpeg-static");
+const FFPROBE_STATIC_PATH = require("ffprobe-static");
 
 /**
  * Configuration options for ThumbnailGenerator
@@ -35,10 +38,30 @@ export interface VideoMetadata {
   filename: string;
   /** File size formatted (e.g., "150 MB") */
   size: string;
+  /** File size in bytes */
+  sizeBytes: number;
   /** Resolution (e.g., "1920x1080") */
   resolution: string;
   /** Playtime formatted (e.g., "1h 30m") */
   playtime: string;
+}
+
+/** FFprobe video stream info */
+interface VideoStream {
+  codec_type?: string;
+  width?: number;
+  height?: number;
+}
+
+/** FFprobe output format */
+interface FfprobeFormat {
+  duration?: string;
+}
+
+/** FFprobe metadata */
+interface FfprobeMetadata {
+  format?: FfprobeFormat;
+  streams?: VideoStream[];
 }
 
 /**
@@ -80,17 +103,19 @@ export class ThumbnailGenerator {
   constructor(options: Partial<ThumbnailOptions> = {}) {
     this.options = {
       cols: options.cols ?? 5,
-      rows: options.rows ?? 5,
-      frameWidth: options.frameWidth ?? 320,
       frameHeight: options.frameHeight ?? 180,
+      frameWidth: options.frameWidth ?? 320,
       outputFormat: options.outputFormat ?? "png",
       quality: options.quality ?? 80,
+      rows: options.rows ?? 5,
       showOverlay: options.showOverlay ?? true,
     };
   }
 
   private findFfmpeg(): string {
-    if (this.ffmpegPath) return this.ffmpegPath;
+    if (this.ffmpegPath) {
+      return this.ffmpegPath;
+    }
 
     try {
       const ffmpegPath = FFMPEG_STATIC_PATH;
@@ -101,35 +126,22 @@ export class ThumbnailGenerator {
     return this.ffmpegPath;
   }
 
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  }
-
-  private formatDuration(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    if (h > 0) return `${h}h ${m}m ${s}s`;
-    if (m > 0) return `${m}m ${s}s`;
-    return `${s}s`;
-  }
-
-  private async getVideoInfo(videoPath: string): Promise<{ duration: number; width: number; height: number }> {
+  private async getVideoInfo(
+    videoPath: string,
+  ): Promise<{ duration: number; width: number; height: number }> {
     return new Promise((resolve, reject) => {
       const args = [
-        "-v", "quiet",
-        "-print_format", "json",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
         "-show_format",
         "-show_streams",
         videoPath,
       ];
 
       const ffmpegPath = this.findFfmpeg();
-      const ffprobePath = ffmpegPath.replace(/ffmpeg$/, "ffprobe");
+      const ffprobePath = FFPROBE_STATIC_PATH.path;
       const proc = spawn(ffprobePath, args, {
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -137,8 +149,12 @@ export class ThumbnailGenerator {
       let stdout = "";
       let stderr = "";
 
-      proc.stdout?.on("data", (data) => { stdout += data.toString(); });
-      proc.stderr?.on("data", (data) => { stderr += data.toString(); });
+      proc.stdout?.on("data", (data) => {
+        stdout += data.toString();
+      });
+      proc.stderr?.on("data", (data) => {
+        stderr += data.toString();
+      });
 
       proc.on("error", reject);
       proc.on("close", (code) => {
@@ -148,78 +164,92 @@ export class ThumbnailGenerator {
         }
 
         try {
-          const metadata = JSON.parse(stdout);
-          const videoStream = metadata.streams?.find((s: any) => s.codec_type === "video");
+          const metadata = JSON.parse(stdout) as FfprobeMetadata;
+          const videoStream = metadata.streams?.find((s) => s.codec_type === "video");
           resolve({
-            duration: parseFloat(metadata.format?.duration) || 0,
-            width: videoStream?.width || 0,
-            height: videoStream?.height || 0,
+            duration: Number.parseFloat(metadata.format?.duration ?? "") || 0,
+            height: videoStream?.height ?? 0,
+            width: videoStream?.width ?? 0,
           });
-        } catch (e) {
+        } catch {
           reject(new Error("Failed to parse ffprobe output"));
         }
       });
     });
   }
 
-  private generateTimestamps(duration: number, count: number): number[] {
-    const timestamps: number[] = [];
-    const interval = duration / (count + 1);
-    for (let i = 1; i <= count; i++) {
-      timestamps.push(interval * i);
-    }
-    return timestamps;
-  }
+  private async extractFrames(
+    videoPath: string,
+    timestamps: number[],
+    tempDir: string,
+  ): Promise<string[]> {
+    const framePaths: string[] = [];
+    const ffmpegPath = this.findFfmpeg();
 
-  private async extractFrames(videoPath: string, timestamps: number[], tempDir: string): Promise<string[]> {
-    const frameIndices = timestamps.map((ts) => Math.floor(ts * 30)).join("+");
-    const filter = `select=eq(n,${frameIndices})`;
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = timestamps[i];
+      if (timestamp === undefined) {
+        continue;
+      }
+      const outputPath = path.join(tempDir, `frame_${String(i + 1).padStart(4, "0")}.jpg`);
 
-    return new Promise((resolve, reject) => {
-      const args = [
-        "-i", videoPath,
-        "-vf", filter,
-        "-frames:v", timestamps.length.toString(),
-        "-f", "image2",
-        path.join(tempDir, "frame_%04d.jpg"),
-      ];
+      await new Promise<void>((resolve, reject) => {
+        const args = [
+          "-ss",
+          timestamp.toString(),
+          "-i",
+          videoPath,
+          "-vframes",
+          "1",
+          "-q:v",
+          "2",
+          outputPath,
+        ];
 
-      const ffmpegPath = this.findFfmpeg();
-      const proc = spawn(ffmpegPath, args);
-
-      let stderr = "";
-      proc.stderr.on("data", (data) => { stderr += data.toString(); });
-      proc.on("error", (err) => reject(err));
-      proc.on("close", (code) => {
-        if (code !== 0) {
-          reject(new Error(`ffmpeg failed: ${stderr}`));
-          return;
-        }
-        const files = fs.readdirSync(tempDir).filter((f: string) => f.startsWith("frame_")).sort();
-        const framePaths = files.map((f: string) => path.join(tempDir, f));
-        resolve(framePaths);
+        const proc = spawn(ffmpegPath, args);
+        let stderr = "";
+        proc.stderr.on("data", (data) => {
+          stderr += data.toString();
+        });
+        proc.on("error", reject);
+        proc.on("close", (code) => {
+          if (code !== 0) {
+            reject(new Error(`ffmpeg failed: ${stderr}`));
+            return;
+          }
+          resolve();
+        });
       });
-    });
+
+      framePaths.push(outputPath);
+    }
+
+    return framePaths;
   }
 
   private async createGrid(framePaths: string[]): Promise<Buffer> {
     const { cols, rows, frameWidth, frameHeight } = this.options;
     const gap = 10;
-    const gridWidth = cols * frameWidth + (cols - 1) * gap;
-    const gridHeight = rows * frameHeight + (rows - 1) * gap;
+    const pad = 16;
+    const gridWidth = cols * frameWidth + (cols - 1) * gap + pad * 2;
+    const gridHeight = rows * frameHeight + (rows - 1) * gap + pad * 2;
 
-    const composites: { input: string; left: number; top: number }[] = [];
+    const composites: { input: Buffer; left: number; top: number }[] = [];
 
     for (let i = 0; i < framePaths.length; i++) {
       const framePath = framePaths[i];
-      if (!framePath) continue;
+      if (!framePath) {
+        continue;
+      }
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const x = col * (frameWidth + gap);
-      const y = row * (frameHeight + gap);
+      const x = pad + col * (frameWidth + gap);
+      const y = pad + row * (frameHeight + gap);
+
+      const resized = await sharp(framePath).resize(frameWidth, frameHeight).toBuffer();
 
       composites.push({
-        input: framePath,
+        input: resized,
         left: x,
         top: y,
       });
@@ -227,13 +257,14 @@ export class ThumbnailGenerator {
 
     const gridBuffer = await sharp({
       create: {
-        width: gridWidth,
+        background: { alpha: 1, b: 255, g: 255, r: 255 },
+        channels: 4,
         height: gridHeight,
-        channels: 3,
-        background: { r: 0, g: 0, b: 0 },
+        width: gridWidth,
       },
     })
       .composite(composites)
+      .png()
       .toBuffer();
 
     return gridBuffer;
@@ -242,40 +273,58 @@ export class ThumbnailGenerator {
   private async addOverlay(gridBuffer: Buffer, metadata: VideoMetadata): Promise<Buffer> {
     const { frameWidth, frameHeight, cols } = this.options;
     const gap = 10;
-    const gridWidth = cols * frameWidth + (cols - 1) * gap;
+    const pad = 16;
+    const gridWidth = cols * frameWidth + (cols - 1) * gap + pad * 2;
 
-    const text = `${metadata.filename} | ${metadata.size} | ${metadata.resolution} | ${metadata.playtime}`;
-    const fontSize = 24;
-    const padding = 10;
-    const headerHeight = fontSize + padding * 2;
+    const fontSize = 18;
+    const padOuter = 18;
+    const padInner = 18;
+    const rowHeight = fontSize + padInner;
+    const headerHeight = rowHeight * 4 + padOuter;
 
-    const svg = `
-      <svg width="${gridWidth}" height="${headerHeight}">
-        <rect width="100%" height="100%" fill="#1a1a1a"/>
-        <text x="10" y="${fontSize + padding}" fill="white" font-family="monospace" font-size="${fontSize}">
-          ${text}
-        </text>
-      </svg>
-    `;
+    const labels = ["File Name:", "File Size:", "Resolution:", "Play Time:"];
+    const values = [
+      metadata.filename,
+      `${metadata.size} (${metadata.sizeBytes.toLocaleString()} Bytes)`,
+      metadata.resolution,
+      metadata.playtime,
+    ];
+
+    const svgParts: string[] = [];
+    svgParts.push(`<rect width="100%" height="100%" fill="#fff"/>`);
+
+    for (let i = 0; i < 4; i++) {
+      const y = padOuter + fontSize + padInner / 2 + i * rowHeight;
+      svgParts.push(
+        `<text x="${padOuter}" y="${y}" fill="#333333" font-family="monospace" font-size="${fontSize}" font-weight="bold">${labels[i]}</text>`,
+      );
+      svgParts.push(
+        `<text x="${padOuter + 120}" y="${y}" fill="#333333" font-family="monospace" font-size="${fontSize}">${values[i]}</text>`,
+      );
+    }
+
+    const svg = `<svg width="${gridWidth}" height="${headerHeight}">${svgParts.join("")}</svg>`;
 
     const headerBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
 
-    const finalHeight = gridBuffer.length ? headerHeight + gridWidth : headerHeight;
+    const gridPad = 16;
+    const gridHeightCalc =
+      this.options.rows * frameHeight + (this.options.rows - 1) * gap + gridPad * 2;
 
-    const gridHeightCalc = this.options.rows * frameHeight + (this.options.rows - 1) * gap;
-
+    const headerGap = 10;
     const final = await sharp({
       create: {
-        width: gridWidth,
-        height: gridHeightCalc,
+        background: { alpha: 1, b: 255, g: 255, r: 255 },
         channels: 4,
-        background: { r: 26, g: 26, b: 26, alpha: 1 },
+        height: gridHeightCalc + headerHeight + headerGap,
+        width: gridWidth,
       },
     })
       .composite([
+        { input: gridBuffer, left: 0, top: headerHeight + headerGap },
         { input: headerBuffer, left: 0, top: 0 },
-        { input: gridBuffer, left: 0, top: headerHeight },
       ])
+      .png()
       .toBuffer();
 
     return final;
@@ -323,7 +372,9 @@ export class ThumbnailGenerator {
     const videoExt = path.extname(normalizedVideoPath).toLowerCase();
     const supportedFormats = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"];
     if (!supportedFormats.includes(videoExt)) {
-      throw new Error(`Unsupported video format: ${videoExt}. Supported: ${supportedFormats.join(", ")}`);
+      throw new Error(
+        `Unsupported video format: ${videoExt}. Supported: ${supportedFormats.join(", ")}`,
+      );
     }
 
     // Resource limits validation
@@ -335,7 +386,9 @@ export class ThumbnailGenerator {
 
     // Validate frame dimensions
     if (this.options.frameWidth > 1920 || this.options.frameHeight > 1080) {
-      throw new Error(`Frame dimensions too large: ${this.options.frameWidth}x${this.options.frameHeight}. Max: 1920x1080`);
+      throw new Error(
+        `Frame dimensions too large: ${this.options.frameWidth}x${this.options.frameHeight}. Max: 1920x1080`,
+      );
     }
 
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "thumbgrid-"));
@@ -360,12 +413,13 @@ export class ThumbnailGenerator {
       logger.debug(`Video info: ${width}x${height}, ${duration}s`);
 
       // Validate video duration
-      if (duration > 7200) { // 2 hours max
+      if (duration > 7200) {
+        // 2 hours max
         await fs.remove(tempDir).catch(() => {});
         throw new Error(`Video too long: ${duration}s. Max allowed: 7200s (2 hours)`);
       }
 
-      const timestamps = this.generateTimestamps(duration, totalFrames);
+      const timestamps = generateTimestamps(duration, totalFrames);
       logger.debug(`Extracting ${totalFrames} frames at timestamps: ${timestamps.join(", ")}`);
 
       logger.info("Extracting frames...");
@@ -381,9 +435,10 @@ export class ThumbnailGenerator {
 
       const metadata: VideoMetadata = {
         filename: path.basename(normalizedVideoPath),
-        size: this.formatBytes(stat.size),
+        playtime: formatDuration(duration),
         resolution: `${width}x${height}`,
-        playtime: this.formatDuration(duration),
+        size: formatBytes(stat.size),
+        sizeBytes: stat.size,
       };
 
       let finalBuffer: Buffer;
@@ -395,24 +450,29 @@ export class ThumbnailGenerator {
 
       try {
         await sharp(finalBuffer)
-          .toFormat(this.options.outputFormat, { quality: this.options.quality })
+          .toFormat(this.options.outputFormat, {
+            quality: this.options.quality,
+          })
           .toFile(output);
-      } catch (writeErr) {
-        throw new Error(`Failed to write output file: ${writeErr instanceof Error ? writeErr.message : writeErr}`);
+      } catch (error) {
+        throw new Error(
+          `Failed to write output file: ${error instanceof Error ? error.message : error}`,
+          { cause: error },
+        );
       }
 
       return {
-        outputPath: output,
-        metadata,
-        frameCount: totalFrames,
         cols: this.options.cols,
+        frameCount: totalFrames,
+        metadata,
+        outputPath: output,
         rows: this.options.rows,
       };
-    } catch (err) {
-      if (err instanceof Error) {
-        throw err;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
       }
-      throw new Error(`Failed to generate thumbnail: ${err}`);
+      throw new Error(`Failed to generate thumbnail: ${error}`, { cause: error });
     } finally {
       await fs.remove(tempDir).catch(() => {});
     }

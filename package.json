@@ -2,34 +2,37 @@
   "name": "better-thumbgrid",
   "version": "1.0.1",
   "description": "Generate grid thumbnails and metadata overlay from video files",
-  "type": "module",
-  "author": "Jirayu Sueb <jirayusueb@gmail.com>",
-  "license": "MIT",
   "keywords": [
-    "video",
-    "thumbnail",
-    "grid",
+    "cli",
     "ffmpeg",
-    "cli"
+    "grid",
+    "thumbnail",
+    "video"
   ],
+  "bugs": {
+    "url": "https://github.com/jirayusueb/better-thumbgrid/issues"
+  },
+  "license": "MIT",
+  "author": "Jirayu Sueb <jirayusueb@gmail.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/jirayusueb/better-thumbgrid"
   },
-  "bugs": {
-    "url": "https://github.com/jirayusueb/better-thumbgrid/issues"
-  },
   "bin": {
     "thumbgrid": "./dist/cli.mjs"
   },
+  "type": "module",
   "exports": {
-    ".": "./dist/lib.mjs"
+    ".": "./dist/core/index.mjs"
   },
   "scripts": {
     "build": "tsdown",
     "dev": "bun run ./src/cli.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0",
@@ -40,8 +43,13 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/fs-extra": "^11.0.4",
+    "ffprobe-static": "^3.1.0",
+    "lefthook": "^2.1.6",
+    "oxfmt": "^0.45.0",
+    "oxlint": "^1.60.0",
     "tsdown": "^0.21.9",
     "typescript": "^5.9.3",
+    "ultracite": "7.6.0",
     "vitest": "^4.1.4"
   }
 }

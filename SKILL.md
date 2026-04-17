@@ -23,20 +23,20 @@ thumbgrid -i video.mp4 -o output.png
 
 ## CLI Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-i, --input` | Input video file | required |
-| `-o, --output` | Output image path | auto-generated |
-| `-c, --cols` | Number of columns | 5 |
-| `-r, --rows` | Number of rows | 5 |
-| `-w, --width` | Frame width (px) | 320 |
-| `-h, --height` | Frame height (px) | 180 |
-| `-f, --format` | Output format (png/jpg) | png |
-| `-q, --quality` | Quality (1-100) | 80 |
-| `-F, --force` | Force overwrite | false |
-| `-v, --verbose` | Verbose logging | false |
-| `--no-overlay` | Disable metadata overlay | false |
-| `-?, --help` | Show help | false |
+| Flag            | Description              | Default        |
+| --------------- | ------------------------ | -------------- |
+| `-i, --input`   | Input video file         | required       |
+| `-o, --output`  | Output image path        | auto-generated |
+| `-c, --cols`    | Number of columns        | 5              |
+| `-r, --rows`    | Number of rows           | 5              |
+| `-w, --width`   | Frame width (px)         | 320            |
+| `-h, --height`  | Frame height (px)        | 180            |
+| `-f, --format`  | Output format (png/jpg)  | png            |
+| `-q, --quality` | Quality (1-100)          | 80             |
+| `-F, --force`   | Force overwrite          | false          |
+| `-v, --verbose` | Verbose logging          | false          |
+| `--no-overlay`  | Disable metadata overlay | false          |
+| `-?, --help`    | Show help                | false          |
 
 ## CLI Examples
 
@@ -92,15 +92,15 @@ console.log(result);
 
 ## Library Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `cols` | number | 5 | Number of columns |
-| `rows` | number | 5 | Number of rows |
-| `frameWidth` | number | 320 | Frame width |
-| `frameHeight` | number | 180 | Frame height |
-| `outputFormat` | "png" \| "jpg" | "png" | Output format |
-| `quality` | number | 80 | Quality (1-100) |
-| `showOverlay` | boolean | true | Show metadata overlay |
+| Option         | Type           | Default | Description           |
+| -------------- | -------------- | ------- | --------------------- |
+| `cols`         | number         | 5       | Number of columns     |
+| `rows`         | number         | 5       | Number of rows        |
+| `frameWidth`   | number         | 320     | Frame width           |
+| `frameHeight`  | number         | 180     | Frame height          |
+| `outputFormat` | "png" \| "jpg" | "png"   | Output format         |
+| `quality`      | number         | 80      | Quality (1-100)       |
+| `showOverlay`  | boolean        | true    | Show metadata overlay |
 
 ## Supported Video Formats
 

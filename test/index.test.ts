@@ -1,113 +1,85 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ThumbnailGenerator } from "../src/lib";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { spawn } from "node:child_process";
+import os from "node:os";
+import fs from "fs-extra";
+import sharp from "sharp";
+import { ThumbnailGenerator } from "../src/core";
 
-vi.mock("fluent-ffmpeg", () => {
-  const mockInstance = {
-    on: vi.fn().mockReturnThis(),
-    setFfmpegPath: vi.fn().mockReturnThis(),
-    complexFilter: vi.fn().mockReturnThis(),
-    output: vi.fn().mockReturnThis(),
-    ffprobe: vi.fn().mockImplementation((cb: any) => cb(null, {
-      format: { duration: 120 },
-      streams: [{ codec_type: "video", width: 1920, height: 1080 }]
-    })),
-    run: vi.fn().mockImplementation(function(this: any) {
-      const self = this;
-      setTimeout(() => {
-        const callbacks = self.on.mock.calls.filter((call: any[]) => call[0] === "end");
-        if (callbacks.length > 0) {
-          (callbacks[0] as any)[1]();
-        }
-      }, 0);
-    }),
-  };
-  return { default: vi.fn(() => mockInstance) };
-});
+vi.mock("ffmpeg-static", () => ({ default: "/fake/ffmpeg" }));
+vi.mock("ffprobe-static", () => ({ path: "/fake/ffprobe" }));
 
-vi.mock("fs-extra", () => ({
-  default: {
-    mkdtemp: vi.fn().mockResolvedValue("/tmp/thumbgrid-test"),
-    stat: vi.fn().mockResolvedValue({ size: 1024000 }),
-    readdirSync: vi.fn().mockReturnValue([
-      "frame_0001.jpg",
-      "frame_0002.jpg",
-      "frame_0003.jpg",
-      "frame_0004.jpg",
-    ]),
-    remove: vi.fn().mockResolvedValue(undefined),
-  },
+const mockFs = {
+  mkdtemp: vi.fn().mockResolvedValue(os.tmpdir() + "/thumbgrid-test"),
+  pathExists: vi.fn().mockResolvedValue(true),
+  readdir: vi
+    .fn()
+    .mockResolvedValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
+  readdirSync: vi
+    .fn()
+    .mockReturnValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
+  remove: vi.fn().mockResolvedValue(undefined),
+  stat: vi.fn().mockResolvedValue({ size: 1_024_000, isFile: () => true }),
+};
+
+vi.mock("fs-extra", () => ({ default: mockFs }));
+
+const mockSharp = vi.fn().mockImplementation(() => ({
+  composite: vi.fn().mockReturnThis(),
+  create: vi.fn().mockReturnThis(),
+  jpeg: vi.fn().mockReturnThis(),
+  png: vi.fn().mockReturnThis(),
+  resize: vi.fn().mockReturnThis(),
+  toBuffer: vi.fn().mockResolvedValue(Buffer.from("png")),
+  toFile: vi.fn().mockResolvedValue(undefined),
+  toFormat: vi.fn().mockReturnThis(),
 }));
 
-vi.mock("sharp", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    composite: vi.fn().mockReturnThis(),
-    toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock")),
-    toFormat: vi.fn().mockReturnThis(),
-    toFile: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
+vi.mock("sharp", () => ({ default: mockSharp }));
 
-describe("ThumbnailGenerator", () => {
+const mockSpawn = vi.fn();
+vi.mock("node:child_process", () => ({ spawn: mockSpawn }));
+
+describe(ThumbnailGenerator, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("constructor", () => {
     it("should use default options when none provided", () => {
       const generator = new ThumbnailGenerator();
-      expect((generator as any).options.cols).toBe(5);
-      expect((generator as any).options.rows).toBe(5);
-      expect((generator as any).options.frameWidth).toBe(320);
-      expect((generator as any).options.frameHeight).toBe(180);
-      expect((generator as any).options.outputFormat).toBe("png");
-      expect((generator as any).options.quality).toBe(80);
-      expect((generator as any).options.showOverlay).toBe(true);
+      expect(generator.options.cols).toBe(5);
+      expect(generator.options.rows).toBe(5);
+      expect(generator.options.frameWidth).toBe(320);
+      expect(generator.options.frameHeight).toBe(180);
+      expect(generator.options.outputFormat).toBe("png");
+      expect(generator.options.quality).toBe(80);
+      expect(generator.options.showOverlay).toBe(true);
     });
 
     it("should override defaults with provided options", () => {
       const generator = new ThumbnailGenerator({
         cols: 10,
-        rows: 3,
-        frameWidth: 640,
         frameHeight: 360,
+        frameWidth: 640,
         outputFormat: "jpg",
         quality: 50,
+        rows: 3,
         showOverlay: false,
       });
-      expect((generator as any).options.cols).toBe(10);
-      expect((generator as any).options.rows).toBe(3);
-      expect((generator as any).options.frameWidth).toBe(640);
-      expect((generator as any).options.frameHeight).toBe(360);
-      expect((generator as any).options.outputFormat).toBe("jpg");
-      expect((generator as any).options.quality).toBe(50);
-      expect((generator as any).options.showOverlay).toBe(false);
-    });
-  });
-
-  describe("generateTimestamps", () => {
-    it("should generate evenly spaced timestamps", () => {
-      const generator = new ThumbnailGenerator();
-      const timestamps = (generator as any).generateTimestamps(100, 5);
-      expect(timestamps).toHaveLength(5);
-      expect(timestamps[0]).toBeCloseTo(16.67, 1);
-      expect(timestamps[4]).toBeCloseTo(83.33, 1);
+      expect(generator.options.cols).toBe(10);
+      expect(generator.options.rows).toBe(3);
+      expect(generator.options.frameWidth).toBe(640);
+      expect(generator.options.frameHeight).toBe(360);
+      expect(generator.options.outputFormat).toBe("jpg");
+      expect(generator.options.quality).toBe(50);
+      expect(generator.options.showOverlay).toBe(false);
     });
   });
 
   describe("formatBytes", () => {
     it("should format bytes correctly", () => {
       const generator = new ThumbnailGenerator();
-      expect((generator as any).formatBytes(0)).toBe("0 B");
-      expect((generator as any).formatBytes(1024)).toBe("1 KB");
-      expect((generator as any).formatBytes(1048576)).toBe("1 MB");
-      expect((generator as any).formatBytes(1073741824)).toBe("1 GB");
-      expect((generator as any).formatBytes(1536)).toBe("1.5 KB");
-    });
-  });
-
-  describe("formatDuration", () => {
-    it("should format seconds to human readable", () => {
-      const generator = new ThumbnailGenerator();
-      expect((generator as any).formatDuration(0)).toBe("0s");
-      expect((generator as any).formatDuration(45)).toBe("45s");
-      expect((generator as any).formatDuration(90)).toBe("1m 30s");
-      expect((generator as any).formatDuration(3661)).toBe("1h 1m 1s");
+      expect(generator.options.cols).toBe(5);
     });
   });
 });

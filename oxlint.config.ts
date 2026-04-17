@@ -1,0 +1,41 @@
+import { defineConfig } from "oxlint";
+
+import core from "ultracite/oxlint/core";
+
+export default defineConfig({
+  extends: [core],
+  rules: {
+    "no-empty-function": "off",
+    "no-plusplus": "off",
+    "no-inline-comments": "off",
+    "class-methods-use-this": "off",
+    "func-style": "off",
+    "prefer-template": "off",
+    complexity: "off",
+    "require-await": "off",
+    radix: "off",
+    "prefer-ternary": "off",
+    "prefer-exponentiation-operator": "off",
+    "sort-keys": "off",
+    "catch-error-name": "off",
+    "no-unused-vars": "off",
+    "no-identical-title": "off",
+    "require-mock-type-parameters": "off",
+    "prefer-await-to-then": "off",
+    "prefer-await-to-callbacks": "off",
+    "prefer-number-properties": "off",
+    "no-useless-undefined": "off",
+    "prefer-module": "off",
+    "numeric-separators-style": "off",
+    "no-explicit-any": "off",
+    "no-inferrable-types": "off",
+    "no-immediate-mutation": "off",
+    "avoid-new": "off",
+    "no-multiple-resolved": "off",
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/no-identical-title": "off",
+    "vitest/valid-title": "off",
+    "jest/require-to-throw-message": "off",
+    "jest/no-identical-title": "off",
+  },
+});

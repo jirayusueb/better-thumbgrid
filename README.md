@@ -56,21 +56,21 @@ thumbgrid -i video.mp4 -o output.png -v
 
 ### Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-i, --input` | Input video file | (required) |
-| `-o, --output` | Output image path | auto-generated |
-| `-c, --cols` | Number of columns | 5 |
-| `-r, --rows` | Number of rows | 5 |
-| `-w, --width` | Frame width (px) | 320 |
-| `-h, --height` | Frame height (px) | 180 |
-| `-f, --format` | Output format (png/jpg) | png |
-| `-q, --quality` | Output quality (1-100) | 80 |
-| `-F, --force` | Force overwrite if output exists | false |
-| `-v, --verbose` | Enable verbose logging | false |
-| `--no-overlay` | Disable metadata overlay | false |
-| `-V, --version` | Show version | false |
-| `-?, --help` | Show help | false |
+| Flag            | Description                      | Default        |
+| --------------- | -------------------------------- | -------------- |
+| `-i, --input`   | Input video file                 | (required)     |
+| `-o, --output`  | Output image path                | auto-generated |
+| `-c, --cols`    | Number of columns                | 5              |
+| `-r, --rows`    | Number of rows                   | 5              |
+| `-w, --width`   | Frame width (px)                 | 320            |
+| `-h, --height`  | Frame height (px)                | 180            |
+| `-f, --format`  | Output format (png/jpg)          | png            |
+| `-q, --quality` | Output quality (1-100)           | 80             |
+| `-F, --force`   | Force overwrite if output exists | false          |
+| `-v, --verbose` | Enable verbose logging           | false          |
+| `--no-overlay`  | Disable metadata overlay         | false          |
+| `-V, --version` | Show version                     | false          |
+| `-?, --help`    | Show help                        | false          |
 
 ## Library Usage
 
@@ -100,15 +100,15 @@ console.log(result);
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `cols` | number | 5 | Number of columns |
-| `rows` | number | 5 | Number of rows |
-| `frameWidth` | number | 320 | Width of each frame |
-| `frameHeight` | number | 180 | Height of each frame |
-| `outputFormat` | "png" \| "jpg" | "png" | Output format |
-| `quality` | number | 80 | Output quality (1-100) |
-| `showOverlay` | boolean | true | Show metadata overlay |
+| Option         | Type           | Default | Description            |
+| -------------- | -------------- | ------- | ---------------------- |
+| `cols`         | number         | 5       | Number of columns      |
+| `rows`         | number         | 5       | Number of rows         |
+| `frameWidth`   | number         | 320     | Width of each frame    |
+| `frameHeight`  | number         | 180     | Height of each frame   |
+| `outputFormat` | "png" \| "jpg" | "png"   | Output format          |
+| `quality`      | number         | 80      | Output quality (1-100) |
+| `showOverlay`  | boolean        | true    | Show metadata overlay  |
 
 ## Examples
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { ThumbnailGenerator } from "../src/lib";
+import { ThumbnailGenerator } from "../src/core";
 import fs from "fs-extra";
 
 interface Timing {
