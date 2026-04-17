@@ -93,7 +93,7 @@ export interface GenerateResult {
  * ```
  */
 export class ThumbnailGenerator {
-  private options: ThumbnailOptions;
+  public readonly options: ThumbnailOptions;
   private ffmpegPath: string = "";
 
   /**
