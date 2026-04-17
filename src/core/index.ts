@@ -365,12 +365,6 @@ export class ThumbnailGenerator {
       throw new Error(`Path is not a file: ${normalizedVideoPath}`);
     }
 
-    // File size limit (500MB default)
-    const maxFileSize = 500 * 1024 * 1024;
-    if (stat.size > maxFileSize) {
-      throw new Error(`File too large: ${stat.size} bytes. Max allowed: ${maxFileSize} bytes`);
-    }
-
     const videoExt = path.extname(normalizedVideoPath).toLowerCase();
     const supportedFormats = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"];
     if (!supportedFormats.includes(videoExt)) {
