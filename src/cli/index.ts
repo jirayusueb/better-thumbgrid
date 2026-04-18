@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { ThumbnailGenerator } from "../core";
 import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
@@ -62,7 +62,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 const parsed = parseArgs({
-  args: Bun.argv.slice(2),
+  args: process.argv.slice(2),
   options: {
     cols: { default: "5", short: "c", type: "string" },
     force: { default: false, short: "F", type: "boolean" },
