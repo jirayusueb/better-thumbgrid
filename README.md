@@ -6,18 +6,37 @@ Generate grid thumbnails and metadata overlay from video files.
 [![GitHub](https://img.shields.io/github/license/jirayusueb/better-thumbgrid)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/jirayusueb/better-thumbgrid)](https://github.com/jirayusueb/better-thumbgrid)
 
+## Quick Start
+
+```bash
+npx better-thumbgrid -i video.mp4 -o output.png
+```
+
 ## Installation
+
+### Via npx (no install)
+
+```bash
+npx better-thumbgrid -i video.mp4 -o output.png
+```
+
+### Via npm (global)
+
+```bash
+npm install -g better-thumbgrid
+thumbgrid -i video.mp4 -o output.png
+```
+
+### Via bun
+
+```bash
+bunx better-thumbgrid -i video.mp4 -o output.png
+```
 
 ### As OpenCode Skill
 
 ```bash
 npx skills@latest add jirayusueb/better-thumbgrid
-```
-
-### Via npm
-
-```bash
-npm install -g better-thumbgrid
 ```
 
 ### From source
@@ -91,11 +110,62 @@ const result = await generator.generate("video.mp4", "output.png");
 console.log(result);
 // {
 //   outputPath: "output.png",
-//   metadata: { filename: "video.mp4", size: "150 MB", resolution: "1920x1080", playtime: "1h 30m 45s" },
+//   metadata: { filename: "video.mp4", size: "150 MB", sizeBytes: 157286400, resolution: "1920x1080", playtime: "01:30:45" },
 //   frameCount: 25,
 //   cols: 5,
 //   rows: 5
 // }
+```
+
+### TypeScript Types
+
+```typescript
+import type { ThumbnailOptions, VideoMetadata, GenerateResult, VideoStream } from "better-thumbgrid";
+
+// All options are optional with sensible defaults
+type ThumbnailOptions = {
+  cols: number;          // Number of columns (default: 5)
+  rows: number;         // Number of rows (default: 5)
+  frameWidth: number;    // Width of each frame in px (default: 320)
+  frameHeight: number; // Height of each frame in px (default: 180)
+  outputFormat: "png" | "jpg"; // Output format (default: "png")
+  quality: number;     // Output quality 1-100 (default: 80)
+  showOverlay: boolean; // Show metadata overlay (default: true)
+};
+
+type GenerateResult = {
+  outputPath: string;
+  metadata: VideoMetadata;
+  frameCount: number;
+  cols: number;
+  rows: number;
+};
+
+type VideoMetadata = {
+  filename: string;
+  size: string;
+  sizeBytes: number;
+  resolution: string;
+  playtime: string;
+};
+```
+
+### Advanced Usage
+
+```typescript
+// Use exported utilities
+import { generateTimestamps, formatBytes, formatDuration } from "better-thumbgrid";
+
+// Generate timestamps for a 60-second video, 10 frames
+const timestamps = generateTimestamps(60, 10);
+console.log(timestamps); // [6, 12, 18, 24, 30, 36, 42, 48, 54, 60]
+
+// Format file size
+console.log(formatBytes(1024));       // "1 KB"
+console.log(formatBytes(1024 * 1024)); // "1 MB"
+
+// Format duration in seconds
+console.log(formatDuration(3661)); // "01:01:01"
 ```
 
 ### Options
@@ -154,6 +224,15 @@ bun run dev
 ## Supported Video Formats
 
 - MP4, MOV, AVI, MKV, WebM, FLV, WMV, M4V
+
+## Limits
+
+| Limit | Value | Description |
+| ------ | ----- | ----------- |
+| Max frames | 100 | 10x10 grid maximum |
+| Max frame width | 1920 | Maximum frame width in pixels |
+| Max frame height | 1080 | Maximum frame height in pixels |
+| Max video duration | 2 hours | Maximum video length |
 
 ## License
 
