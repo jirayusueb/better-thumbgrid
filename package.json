@@ -1,6 +1,6 @@
 {
   "name": "better-thumbgrid",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Generate grid thumbnails and metadata overlay from video files",
   "keywords": [
     "cli",
