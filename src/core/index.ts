@@ -17,7 +17,6 @@ const FFPROBE_STATIC_PATH = require("ffprobe-static");
 const MAX_FRAMES = 100;
 const MAX_FRAME_WIDTH = 1920;
 const MAX_FRAME_HEIGHT = 1080;
-const MAX_DURATION_SECONDS = 7200;
 
 /**
  * Configuration options for ThumbnailGenerator
@@ -447,12 +446,6 @@ export class ThumbnailGenerator {
       logger.info("Getting video info...");
       const { duration, width, height } = await this.getVideoInfo(validatedPath);
       logger.debug(`Video info: ${width}x${height}, ${duration}s`);
-
-      if (duration > MAX_DURATION_SECONDS) {
-        throw new Error(
-          `Video too long: ${duration}s. Max allowed: ${MAX_DURATION_SECONDS}s (2 hours)`,
-        );
-      }
 
       const totalFrames = this.options.cols * this.options.rows;
       const timestamps = generateTimestamps(duration, totalFrames);

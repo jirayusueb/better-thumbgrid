@@ -120,16 +120,21 @@ console.log(result);
 ### TypeScript Types
 
 ```typescript
-import type { ThumbnailOptions, VideoMetadata, GenerateResult, VideoStream } from "better-thumbgrid";
+import type {
+  ThumbnailOptions,
+  VideoMetadata,
+  GenerateResult,
+  VideoStream,
+} from "better-thumbgrid";
 
 // All options are optional with sensible defaults
 type ThumbnailOptions = {
-  cols: number;          // Number of columns (default: 5)
-  rows: number;         // Number of rows (default: 5)
-  frameWidth: number;    // Width of each frame in px (default: 320)
+  cols: number; // Number of columns (default: 5)
+  rows: number; // Number of rows (default: 5)
+  frameWidth: number; // Width of each frame in px (default: 320)
   frameHeight: number; // Height of each frame in px (default: 180)
   outputFormat: "png" | "jpg"; // Output format (default: "png")
-  quality: number;     // Output quality 1-100 (default: 80)
+  quality: number; // Output quality 1-100 (default: 80)
   showOverlay: boolean; // Show metadata overlay (default: true)
 };
 
@@ -161,7 +166,7 @@ const timestamps = generateTimestamps(60, 10);
 console.log(timestamps); // [6, 12, 18, 24, 30, 36, 42, 48, 54, 60]
 
 // Format file size
-console.log(formatBytes(1024));       // "1 KB"
+console.log(formatBytes(1024)); // "1 KB"
 console.log(formatBytes(1024 * 1024)); // "1 MB"
 
 // Format duration in seconds
@@ -227,12 +232,11 @@ bun run dev
 
 ## Limits
 
-| Limit | Value | Description |
-| ------ | ----- | ----------- |
-| Max frames | 100 | 10x10 grid maximum |
-| Max frame width | 1920 | Maximum frame width in pixels |
-| Max frame height | 1080 | Maximum frame height in pixels |
-| Max video duration | 2 hours | Maximum video length |
+| Limit            | Value | Description                    |
+| ---------------- | ----- | ------------------------------ |
+| Max frames       | 100   | 10x10 grid maximum             |
+| Max frame width  | 1920  | Maximum frame width in pixels  |
+| Max frame height | 1080  | Maximum frame height in pixels |
 
 ## License
 
