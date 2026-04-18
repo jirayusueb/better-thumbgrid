@@ -7,37 +7,36 @@ import { ThumbnailGenerator } from "../src/core";
 
 vi.mock("ffmpeg-static", () => ({ default: "/fake/ffmpeg" }));
 vi.mock("ffprobe-static", () => ({ path: "/fake/ffprobe" }));
-
-const mockFs = {
-  mkdtemp: vi.fn().mockResolvedValue(os.tmpdir() + "/thumbgrid-test"),
-  pathExists: vi.fn().mockResolvedValue(true),
-  readdir: vi
-    .fn()
-    .mockResolvedValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
-  readdirSync: vi
-    .fn()
-    .mockReturnValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
-  remove: vi.fn().mockResolvedValue(undefined),
-  stat: vi.fn().mockResolvedValue({ size: 1_024_000, isFile: () => true }),
-};
-
-vi.mock("fs-extra", () => ({ default: mockFs }));
-
-const mockSharp = vi.fn().mockImplementation(() => ({
-  composite: vi.fn().mockReturnThis(),
-  create: vi.fn().mockReturnThis(),
-  jpeg: vi.fn().mockReturnThis(),
-  png: vi.fn().mockReturnThis(),
-  resize: vi.fn().mockReturnThis(),
-  toBuffer: vi.fn().mockResolvedValue(Buffer.from("png")),
-  toFile: vi.fn().mockResolvedValue(undefined),
-  toFormat: vi.fn().mockReturnThis(),
+vi.mock("node:child_process", () => ({
+  default: { spawn: vi.fn() },
+  spawn: vi.fn(),
 }));
-
-vi.mock("sharp", () => ({ default: mockSharp }));
-
-const mockSpawn = vi.fn();
-vi.mock("node:child_process", () => ({ spawn: mockSpawn }));
+vi.mock("fs-extra", () => ({
+  default: {
+    mkdtemp: vi.fn().mockResolvedValue(os.tmpdir() + "/thumbgrid-test"),
+    pathExists: vi.fn().mockResolvedValue(true),
+    readdir: vi
+      .fn()
+      .mockResolvedValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
+    readdirSync: vi
+      .fn()
+      .mockReturnValue(["frame_0001.jpg", "frame_0002.jpg", "frame_0003.jpg", "frame_0004.jpg"]),
+    remove: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({ size: 1_024_000, isFile: () => true }),
+  },
+}));
+vi.mock("sharp", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    composite: vi.fn().mockReturnThis(),
+    create: vi.fn().mockReturnThis(),
+    jpeg: vi.fn().mockReturnThis(),
+    png: vi.fn().mockReturnThis(),
+    resize: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue(Buffer.from("png")),
+    toFile: vi.fn().mockResolvedValue(undefined),
+    toFormat: vi.fn().mockReturnThis(),
+  })),
+}));
 
 describe(ThumbnailGenerator, () => {
   beforeEach(() => {
@@ -58,28 +57,28 @@ describe(ThumbnailGenerator, () => {
 
     it("should override defaults with provided options", () => {
       const generator = new ThumbnailGenerator({
-        cols: 10,
-        frameHeight: 360,
+        cols: 3,
+        rows: 4,
         frameWidth: 640,
+        frameHeight: 360,
         outputFormat: "jpg",
-        quality: 50,
-        rows: 3,
+        quality: 90,
         showOverlay: false,
       });
-      expect(generator.options.cols).toBe(10);
-      expect(generator.options.rows).toBe(3);
+      expect(generator.options.cols).toBe(3);
+      expect(generator.options.rows).toBe(4);
       expect(generator.options.frameWidth).toBe(640);
       expect(generator.options.frameHeight).toBe(360);
       expect(generator.options.outputFormat).toBe("jpg");
-      expect(generator.options.quality).toBe(50);
+      expect(generator.options.quality).toBe(90);
       expect(generator.options.showOverlay).toBe(false);
     });
   });
 
-  describe("formatBytes", () => {
-    it("should format bytes correctly", () => {
+  describe("generate", () => {
+    it("should throw error if videoPath is empty", async () => {
       const generator = new ThumbnailGenerator();
-      expect(generator.options.cols).toBe(5);
+      await expect(generator.generate("")).rejects.toThrow("Video path is required");
     });
   });
 });

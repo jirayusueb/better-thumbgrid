@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
+import { createRequire } from "node:module";
 import sharp from "sharp";
 import fs from "fs-extra";
 import { logger } from "../utils/logger";
@@ -9,8 +10,14 @@ import { generateTimestamps } from "../utils/timestamps";
 export { formatBytes, formatDuration } from "../utils/formatters";
 export { generateTimestamps } from "../utils/timestamps";
 
+const require = createRequire(import.meta.url);
 const FFMPEG_STATIC_PATH = require("ffmpeg-static");
 const FFPROBE_STATIC_PATH = require("ffprobe-static");
+
+const MAX_FRAMES = 100;
+const MAX_FRAME_WIDTH = 1920;
+const MAX_FRAME_HEIGHT = 1080;
+const MAX_DURATION_SECONDS = 7200;
 
 /**
  * Configuration options for ThumbnailGenerator
@@ -229,15 +236,33 @@ export class ThumbnailGenerator {
     return framePaths;
   }
 
-  private async createGrid(framePaths: string[]): Promise<Buffer> {
-    const { cols, rows, frameWidth, frameHeight } = this.options;
+  private calculateGridDimensions(
+    cols: number,
+    rows: number,
+    frameWidth: number,
+    frameHeight: number,
+  ): { width: number; height: number } {
     const gap = 10;
     const pad = 16;
-    const gridWidth = cols * frameWidth + (cols - 1) * gap + pad * 2;
-    const gridHeight = rows * frameHeight + (rows - 1) * gap + pad * 2;
+    return {
+      width: cols * frameWidth + (cols - 1) * gap + pad * 2,
+      height: rows * frameHeight + (rows - 1) * gap + pad * 2,
+    };
+  }
+
+  private async createGrid(framePaths: string[]): Promise<Buffer> {
+    const { cols, rows, frameWidth, frameHeight } = this.options;
+    const { width: gridWidth, height: gridHeight } = this.calculateGridDimensions(
+      cols,
+      rows,
+      frameWidth,
+      frameHeight,
+    );
 
     const composites: { input: Buffer; left: number; top: number }[] = [];
 
+    const pad = 16;
+    const gap = 10;
     for (let i = 0; i < framePaths.length; i++) {
       const framePath = framePaths[i];
       if (!framePath) {
@@ -273,10 +298,13 @@ export class ThumbnailGenerator {
   }
 
   private async addOverlay(gridBuffer: Buffer, metadata: VideoMetadata): Promise<Buffer> {
-    const { frameWidth, frameHeight, cols } = this.options;
-    const gap = 10;
-    const pad = 16;
-    const gridWidth = cols * frameWidth + (cols - 1) * gap + pad * 2;
+    const { frameWidth, frameHeight, cols, rows } = this.options;
+    const { width: gridWidth, height: gridHeight } = this.calculateGridDimensions(
+      cols,
+      rows,
+      frameWidth,
+      frameHeight,
+    );
 
     const fontSize = 18;
     const padOuter = 18;
@@ -309,16 +337,12 @@ export class ThumbnailGenerator {
 
     const headerBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
 
-    const gridPad = 16;
-    const gridHeightCalc =
-      this.options.rows * frameHeight + (this.options.rows - 1) * gap + gridPad * 2;
-
     const headerGap = 10;
     const final = await sharp({
       create: {
         background: { alpha: 1, b: 255, g: 255, r: 255 },
         channels: 4,
-        height: gridHeightCalc + headerHeight + headerGap,
+        height: gridHeight + headerHeight + headerGap,
         width: gridWidth,
       },
     })
@@ -332,6 +356,72 @@ export class ThumbnailGenerator {
     return final;
   }
 
+  private SUPPORTED_VIDEO_FORMATS = [
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".webm",
+    ".flv",
+    ".wmv",
+    ".m4v",
+  ];
+
+  private async validateInputPath(videoPath: string): Promise<{ path: string; stat: fs.Stats }> {
+    if (!videoPath) {
+      throw new Error("Video path is required");
+    }
+
+    const resolved = path.resolve(videoPath);
+    const normalized = path.normalize(resolved);
+
+    if (videoPath.includes("..") || normalized.includes("..")) {
+      throw new Error("Invalid path: path traversal not allowed");
+    }
+
+    if (!(await fs.pathExists(normalized))) {
+      throw new Error(`Video file not found: ${normalized}`);
+    }
+
+    const stat = await fs.stat(normalized);
+    if (!stat.isFile()) {
+      throw new Error(`Path is not a file: ${normalized}`);
+    }
+
+    const ext = path.extname(normalized).toLowerCase();
+    if (!this.SUPPORTED_VIDEO_FORMATS.includes(ext)) {
+      throw new Error(
+        `Unsupported video format: ${ext}. Supported: ${this.SUPPORTED_VIDEO_FORMATS.join(", ")}`,
+      );
+    }
+
+    return { path: normalized, stat };
+  }
+
+  private validateOptions(): void {
+    const totalFrames = this.options.cols * this.options.rows;
+    if (totalFrames > MAX_FRAMES) {
+      throw new Error(`Too many frames: ${totalFrames}. Max allowed: ${MAX_FRAMES}`);
+    }
+
+    if (this.options.frameWidth > MAX_FRAME_WIDTH || this.options.frameHeight > MAX_FRAME_HEIGHT) {
+      throw new Error(
+        `Frame dimensions too large: ${this.options.frameWidth}x${this.options.frameHeight}. Max: ${MAX_FRAME_WIDTH}x${MAX_FRAME_HEIGHT}`,
+      );
+    }
+  }
+
+  private resolveOutputPath(outputPath?: string): string {
+    if (outputPath) {
+      const resolved = path.resolve(outputPath);
+      if (outputPath.includes("..") || resolved.includes("..")) {
+        throw new Error("Invalid output path: path traversal not allowed");
+      }
+      return resolved;
+    }
+    return path.resolve(`thumbgrid_${Date.now()}.${this.options.outputFormat}`);
+  }
+
   /**
    * Generates a grid thumbnail from the video file.
    * @param videoPath - Path to the input video file
@@ -342,84 +432,30 @@ export class ThumbnailGenerator {
   async generate(videoPath: string, outputPath?: string): Promise<GenerateResult> {
     logger.debug(`Starting thumbnail generation for: ${videoPath}`);
 
-    if (!videoPath) {
-      throw new Error("Video path is required");
-    }
-
-    // Path traversal prevention - resolve to absolute and check it's within allowed dirs
-    const resolvedVideoPath = path.resolve(videoPath);
-    const normalizedVideoPath = path.normalize(resolvedVideoPath);
-
-    // Check for path traversal attempts
-    if (videoPath.includes("..") || normalizedVideoPath.includes("..")) {
-      throw new Error("Invalid path: path traversal not allowed");
-    }
-
-    const videoExists = await fs.pathExists(normalizedVideoPath);
-    if (!videoExists) {
-      throw new Error(`Video file not found: ${normalizedVideoPath}`);
-    }
-
-    const stat = await fs.stat(normalizedVideoPath);
-    if (!stat.isFile()) {
-      throw new Error(`Path is not a file: ${normalizedVideoPath}`);
-    }
-
-    const videoExt = path.extname(normalizedVideoPath).toLowerCase();
-    const supportedFormats = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"];
-    if (!supportedFormats.includes(videoExt)) {
-      throw new Error(
-        `Unsupported video format: ${videoExt}. Supported: ${supportedFormats.join(", ")}`,
-      );
-    }
-
-    // Resource limits validation
-    const maxFrames = 100; // max 10x10 grid
-    const totalFrames = this.options.cols * this.options.rows;
-    if (totalFrames > maxFrames) {
-      throw new Error(`Too many frames: ${totalFrames}. Max allowed: ${maxFrames}`);
-    }
-
-    // Validate frame dimensions
-    if (this.options.frameWidth > 1920 || this.options.frameHeight > 1080) {
-      throw new Error(
-        `Frame dimensions too large: ${this.options.frameWidth}x${this.options.frameHeight}. Max: 1920x1080`,
-      );
-    }
-
+    this.validateOptions();
+    const { path: validatedPath, stat } = await this.validateInputPath(videoPath);
+    const output = this.resolveOutputPath(outputPath);
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "thumbgrid-"));
     logger.debug(`Created temp directory: ${tempDir}`);
 
-    let output: string;
-    if (outputPath) {
-      // Sanitize output path
-      const resolvedOutputPath = path.resolve(outputPath);
-      if (outputPath.includes("..") || resolvedOutputPath.includes("..")) {
-        await fs.remove(tempDir).catch(() => {});
-        throw new Error("Invalid output path: path traversal not allowed");
-      }
-      output = resolvedOutputPath;
-    } else {
-      output = path.resolve(`thumbgrid_${Date.now()}.${this.options.outputFormat}`);
-    }
-
     try {
       logger.info("Getting video info...");
-      const { duration, width, height } = await this.getVideoInfo(normalizedVideoPath);
+      const { duration, width, height } = await this.getVideoInfo(validatedPath);
       logger.debug(`Video info: ${width}x${height}, ${duration}s`);
 
-      // Validate video duration
-      if (duration > 7200) {
-        // 2 hours max
+      if (duration > MAX_DURATION_SECONDS) {
         await fs.remove(tempDir).catch(() => {});
-        throw new Error(`Video too long: ${duration}s. Max allowed: 7200s (2 hours)`);
+        throw new Error(
+          `Video too long: ${duration}s. Max allowed: ${MAX_DURATION_SECONDS}s (2 hours)`,
+        );
       }
 
+      const totalFrames = this.options.cols * this.options.rows;
       const timestamps = generateTimestamps(duration, totalFrames);
       logger.debug(`Extracting ${totalFrames} frames at timestamps: ${timestamps.join(", ")}`);
 
       logger.info("Extracting frames...");
-      const framePaths = await this.extractFrames(normalizedVideoPath, timestamps, tempDir);
+      const framePaths = await this.extractFrames(validatedPath, timestamps, tempDir);
 
       if (framePaths.length === 0) {
         throw new Error("Failed to extract frames from video");
@@ -430,7 +466,7 @@ export class ThumbnailGenerator {
       const gridBuffer = await this.createGrid(framePaths);
 
       const metadata: VideoMetadata = {
-        filename: path.basename(normalizedVideoPath),
+        filename: path.basename(validatedPath),
         playtime: formatDuration(duration),
         resolution: `${width}x${height}`,
         size: formatBytes(stat.size),

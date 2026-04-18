@@ -1,11 +1,18 @@
 #!/usr/bin/env bun
 import { ThumbnailGenerator } from "../core";
 import { parseArgs } from "node:util";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import ora from "ora";
 import fs from "fs-extra";
 import { logger } from "../utils/logger";
 
-const VERSION = "1.0.0";
+const __dirname = import.meta.dirname;
+const packageJsonPath = resolve(__dirname, "../../package.json");
+const packageJsonRaw = readFileSync(packageJsonPath, "utf-8");
+const PACKAGE_JSON = JSON.parse(packageJsonRaw);
+const VERSION = PACKAGE_JSON.version ?? "1.0.0";
 
 interface CliArgs {
   version?: boolean;
@@ -132,10 +139,9 @@ const cliGenerator = new ThumbnailGenerator({
 const spinner = ora("Generating thumbnail...").start();
 
 if (parsed.verbose) {
+  const { cols, rows } = cliGenerator.options;
   logger.debug(`Input: ${cliInput}`);
-  logger.debug(
-    `Options: cols=${(cliGenerator as unknown as { options: { cols: number } }).options.cols}, rows=${(cliGenerator as unknown as { options: { rows: number } }).options.rows}`,
-  );
+  logger.debug(`Options: cols=${cols}, rows=${rows}`);
 }
 
 try {
