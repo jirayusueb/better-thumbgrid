@@ -56,7 +56,7 @@ export interface VideoMetadata {
 }
 
 /** FFprobe video stream info */
-interface VideoStream {
+export interface VideoStream {
   codec_type?: string;
   width?: number;
   height?: number;
@@ -187,52 +187,57 @@ export class ThumbnailGenerator {
     });
   }
 
+  private async extractSingleFrame(
+    videoPath: string,
+    timestamp: number,
+    tempDir: string,
+    index: number,
+  ): Promise<string> {
+    const outputPath = path.join(tempDir, `frame_${String(index).padStart(4, "0")}.jpg`);
+    const ffmpegPath = this.findFfmpeg();
+
+    await new Promise<void>((resolve, reject) => {
+      const args = [
+        "-ss",
+        timestamp.toString(),
+        "-i",
+        videoPath,
+        "-vframes",
+        "1",
+        "-q:v",
+        "2",
+        outputPath,
+      ];
+
+      const proc = spawn(ffmpegPath, args);
+      let stderr = "";
+      proc.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+      proc.on("error", reject);
+      proc.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`ffmpeg failed: ${stderr}`));
+          return;
+        }
+        resolve();
+      });
+    });
+
+    return outputPath;
+  }
+
   private async extractFrames(
     videoPath: string,
     timestamps: number[],
     tempDir: string,
   ): Promise<string[]> {
-    const framePaths: string[] = [];
-    const ffmpegPath = this.findFfmpeg();
-
-    for (let i = 0; i < timestamps.length; i++) {
-      const timestamp = timestamps[i];
-      if (timestamp === undefined) {
-        continue;
-      }
-      const outputPath = path.join(tempDir, `frame_${String(i + 1).padStart(4, "0")}.jpg`);
-
-      await new Promise<void>((resolve, reject) => {
-        const args = [
-          "-ss",
-          timestamp.toString(),
-          "-i",
-          videoPath,
-          "-vframes",
-          "1",
-          "-q:v",
-          "2",
-          outputPath,
-        ];
-
-        const proc = spawn(ffmpegPath, args);
-        let stderr = "";
-        proc.stderr.on("data", (data) => {
-          stderr += data.toString();
-        });
-        proc.on("error", reject);
-        proc.on("close", (code) => {
-          if (code !== 0) {
-            reject(new Error(`ffmpeg failed: ${stderr}`));
-            return;
-          }
-          resolve();
-        });
-      });
-
-      framePaths.push(outputPath);
-    }
-
+    const validTimestamps = timestamps.filter((t): t is number => t !== undefined);
+    const framePaths = await Promise.all(
+      validTimestamps.map((timestamp, i) =>
+        this.extractSingleFrame(videoPath, timestamp, tempDir, i + 1),
+      ),
+    );
     return framePaths;
   }
 
@@ -444,7 +449,6 @@ export class ThumbnailGenerator {
       logger.debug(`Video info: ${width}x${height}, ${duration}s`);
 
       if (duration > MAX_DURATION_SECONDS) {
-        await fs.remove(tempDir).catch(() => {});
         throw new Error(
           `Video too long: ${duration}s. Max allowed: ${MAX_DURATION_SECONDS}s (2 hours)`,
         );
